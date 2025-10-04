@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import UserNavbar from "../../components/user/common/UserNavbar";
 import AuthForm from "../../components/common/AuthForm";
 import Button from "../../components/common/Button";
+import { sendOtp, verifyOtp, registerUser } from "../../api/auth";
 
 const OTP_LENGTH = 6;
 
@@ -10,32 +11,51 @@ const Register = () => {
   const navigate = useNavigate();
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
-  const [expectedOtp, setExpectedOtp] = useState("");
   const [otpFeedback, setOtpFeedback] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendOtp = useCallback((phoneNumber, resetOtp) => {
+  // Send OTP to user's mobile number via backend API
+  const handleSendOtp = useCallback(async (phoneNumber, resetOtp) => {
     if (!phoneNumber || phoneNumber.trim().length !== 10) {
       setOtpFeedback({
         type: "error",
-        message:
-          "Enter a valid 10-digit mobile number before requesting an OTP.",
+        message: "Enter a valid 10-digit mobile number before requesting an OTP.",
       });
       return;
     }
 
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setExpectedOtp(generatedOtp);
-    setIsOtpSent(true);
-    setIsOtpVerified(false);
-    resetOtp?.();
-    setOtpFeedback({
-      type: "info",
-      message: `OTP sent successfully. (For demo use ${generatedOtp})`,
-    });
+    setIsLoading(true);
+    try {
+      // Call backend API to send OTP via Twilio
+      const response = await sendOtp({ mobileNumber: phoneNumber });
+      
+      if (response.success) {
+        setIsOtpSent(true);
+        setIsOtpVerified(false);
+        resetOtp?.();
+        setOtpFeedback({
+          type: "success",
+          message: "OTP sent successfully to your mobile number!",
+        });
+      } else {
+        setOtpFeedback({
+          type: "error",
+          message: response.message || "Failed to send OTP. Please try again.",
+        });
+      }
+    } catch (error) {
+      setOtpFeedback({
+        type: "error",
+        message: error.message || "Failed to send OTP. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
+  // Verify OTP entered by user via backend API
   const handleVerifyOtp = useCallback(
-    (enteredOtp) => {
+    async (enteredOtp, phoneNumber) => {
       if (!isOtpSent) {
         setOtpFeedback({
           type: "error",
@@ -52,22 +72,35 @@ const Register = () => {
         return;
       }
 
-      if (enteredOtp !== expectedOtp) {
+      setIsLoading(true);
+      try {
+        // Call backend API to verify OTP via Twilio
+        const response = await verifyOtp({ mobileNumber: phoneNumber, otp: enteredOtp });
+        
+        if (response.success) {
+          setIsOtpVerified(true);
+          setOtpFeedback({
+            type: "success",
+            message: "OTP verified successfully. You can now create your password.",
+          });
+        } else {
+          setIsOtpVerified(false);
+          setOtpFeedback({
+            type: "error",
+            message: response.message || "Invalid OTP. Please try again.",
+          });
+        }
+      } catch (error) {
+        setIsOtpVerified(false);
         setOtpFeedback({
           type: "error",
-          message: "Invalid OTP. Please try again.",
+          message: error.message || "OTP verification failed. Please try again.",
         });
-        setIsOtpVerified(false);
-        return;
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsOtpVerified(true);
-      setOtpFeedback({
-        type: "success",
-        message: "OTP verified successfully. You can now create your password.",
-      });
     },
-    [expectedOtp, isOtpSent]
+    [isOtpSent]
   );
 
   const fields = [
@@ -125,9 +158,9 @@ const Register = () => {
                   onClick={() =>
                     handleSendOtp(value, () => setFieldValue("otp", ""))
                   }
-                  disabled={value.length !== 10}
+                  disabled={value.length !== 10 || isLoading}
                 >
-                  {isOtpSent ? "Resend OTP" : "Send OTP"}
+                  {isLoading ? "Sending..." : isOtpSent ? "Resend OTP" : "Send OTP"}
                 </Button>
               </div>
               <div className="space-y-2">
@@ -147,12 +180,12 @@ const Register = () => {
                 <Button
                   type="button"
                   className="w-full border border-emerald-300/60 bg-transparent text-emerald-100 hover:bg-emerald-400/10"
-                  onClick={() => handleVerifyOtp(formData.otp ?? "")}
+                  onClick={() => handleVerifyOtp(formData.otp ?? "", value)}
                   disabled={
-                    !isOtpSent || (formData.otp ?? "").length !== OTP_LENGTH
+                    !isOtpSent || (formData.otp ?? "").length !== OTP_LENGTH || isLoading
                   }
                 >
-                  Verify OTP
+                  {isLoading ? "Verifying..." : "Verify OTP"}
                 </Button>
               </div>
             </div>
@@ -200,7 +233,8 @@ const Register = () => {
     { label: "Google", onClick: () => alert("Register with Google") },
   ];
 
-  const handleSubmit = (formValues) => {
+  // Submit registration form and create user account via backend API
+  const handleSubmit = async (formValues) => {
     if (!isOtpVerified) {
       setOtpFeedback({
         type: "error",
@@ -217,12 +251,37 @@ const Register = () => {
       return;
     }
 
-    setOtpFeedback({
-      type: "success",
-      message: "Account created successfully! Redirecting to home...",
-    });
+    setIsLoading(true);
+    try {
+      // Call backend API to register user
+      const response = await registerUser({
+        mobileNumber: formValues.phoneNumber,
+        password: formValues.password,
+        confirmPassword: formValues.confirmPassword,
+        fullName: formValues.fullName || "",
+        email: formValues.email || "",
+      });
 
-    setTimeout(() => navigate("/"), 600);
+      if (response.success) {
+        setOtpFeedback({
+          type: "success",
+          message: "Account created successfully! Redirecting to home...",
+        });
+        setTimeout(() => navigate("/"), 1000);
+      } else {
+        setOtpFeedback({
+          type: "error",
+          message: response.message || "Registration failed. Please try again.",
+        });
+      }
+    } catch (error) {
+      setOtpFeedback({
+        type: "error",
+        message: error.message || "Registration failed. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

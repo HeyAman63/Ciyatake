@@ -1,87 +1,94 @@
 import { apiRequest, withApiFallback } from "./client";
 
+// Helper function to create standardized response
 const createMockResponse = (data = {}) => ({
   success: true,
   ...data,
 });
 
-export const sendOtp = async ({ phoneNumber, context = "register" }) =>
-  withApiFallback(
-    () =>
-      apiRequest("/auth/otp", {
-        method: "POST",
-        body: { phoneNumber, context },
-      }),
-    () =>
-      Promise.resolve(
-        createMockResponse({
-          message: "OTP sent (mock)",
-          otp: "123456",
-        })
-      )
-  );
+// Send OTP to user's mobile number via Twilio
+export const sendOtp = async ({ mobileNumber }) => {
+  try {
+    const response = await apiRequest("/auth/send-otp", {
+      method: "POST",
+      body: { mobileNumber },
+    });
+    return response;
+  } catch (error) {
+    throw new Error(error.message || "Failed to send OTP");
+  }
+};
 
-export const verifyOtp = async ({ phoneNumber, otp, context = "register" }) =>
-  withApiFallback(
-    () =>
-      apiRequest("/auth/otp/verify", {
-        method: "POST",
-        body: { phoneNumber, otp, context },
-      }),
-    () =>
-      Promise.resolve(
-        createMockResponse({
-          message: "OTP verified (mock)",
-        })
-      )
-  );
+// Verify OTP entered by user
+export const verifyOtp = async ({ mobileNumber, otp }) => {
+  try {
+    const response = await apiRequest("/auth/verify-otp", {
+      method: "POST",
+      body: { mobileNumber, otp },
+    });
+    return response;
+  } catch (error) {
+    throw new Error(error.message || "OTP verification failed");
+  }
+};
 
-export const registerUser = async (payload) =>
-  withApiFallback(
-    () =>
-      apiRequest("/auth/register", {
-        method: "POST",
-        body: payload,
-      }),
-    () =>
-      Promise.resolve(
-        createMockResponse({
-          message: "User registered (mock)",
-          user: {
-            id: "mock-user",
-            phoneNumber: payload?.phoneNumber,
-          },
-        })
-      )
-  );
+// Register new user account after OTP verification
+export const registerUser = async ({ mobileNumber, password, confirmPassword, fullName, email }) => {
+  try {
+    const response = await apiRequest("/auth/signup", {
+      method: "POST",
+      body: { mobileNumber, password, confirmPassword, fullName, email },
+    });
+    
+    // Save user token and data to localStorage
+    if (response.success && response.token) {
+      localStorage.setItem("authToken", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+    }
+    
+    return response;
+  } catch (error) {
+    throw new Error(error.message || "Registration failed");
+  }
+};
 
-export const loginUser = async (payload) =>
-  withApiFallback(
-    () =>
-      apiRequest("/auth/login", {
-        method: "POST",
-        body: payload,
-      }),
-    () =>
-      Promise.resolve(
-        createMockResponse({
-          message: "Login successful (mock)",
-          token: "mock-token",
-        })
-      )
-  );
+// Login existing user with mobile number and password
+export const loginUser = async ({ mobileNumber, password }) => {
+  try {
+    const response = await apiRequest("/auth/login", {
+      method: "POST",
+      body: { mobileNumber, password },
+    });
+    
+    // Save user token and data to localStorage
+    if (response.success && response.token) {
+      localStorage.setItem("authToken", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+    }
+    
+    return response;
+  } catch (error) {
+    throw new Error(error.message || "Login failed");
+  }
+};
 
-export const updatePassword = async (payload) =>
-  withApiFallback(
-    () =>
-      apiRequest("/auth/password", {
-        method: "PATCH",
-        body: payload,
-      }),
-    () =>
-      Promise.resolve(
-        createMockResponse({
-          message: "Password updated (mock)",
-        })
-      )
-  );
+// Logout user by clearing stored authentication data
+export const logoutUser = () => {
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("user");
+};
+
+// Get currently logged-in user from localStorage
+export const getCurrentUser = () => {
+  try {
+    const user = localStorage.getItem("user");
+    return user ? JSON.parse(user) : null;
+  } catch {
+    return null;
+  }
+};
+
+// Get authentication token from localStorage
+export const getAuthToken = () => {
+  return localStorage.getItem("authToken");
+};

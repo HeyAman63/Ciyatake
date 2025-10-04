@@ -66,7 +66,9 @@ export const apiRequest = async (
   const payload = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
-    throw new ApiError("Request failed", {
+    // Extract error message from backend response
+    const errorMessage = payload?.message || payload?.error || "Request failed";
+    throw new ApiError(errorMessage, {
       status: response.status,
       payload,
     });

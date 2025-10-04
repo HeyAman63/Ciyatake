@@ -2,10 +2,13 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuthForm from "../../components/common/AuthForm";
 import UserNavbar from "../../components/user/common/UserNavbar";
+import { loginUser } from "../../api/auth";
 
 const Login = () => {
   const navigate = useNavigate();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const fields = [
     {
@@ -59,21 +62,47 @@ const Login = () => {
     { label: "Google", onClick: () => alert("Login with Google") },
   ];
 
-  const handleLogin = (formValues) => {
-    localStorage.setItem("User1", formValues.phoneNumber ?? "");
-    navigate("/");
+  // Handle user login via backend API
+  const handleLogin = async (formValues) => {
+    setIsLoading(true);
+    setErrorMessage("");
+    
+    try {
+      // Call backend API to authenticate user
+      const response = await loginUser({
+        mobileNumber: formValues.phoneNumber,
+        password: formValues.password,
+      });
+
+      if (response.success) {
+        // Redirect to home page on successful login
+        navigate("/");
+      } else {
+        setErrorMessage(response.message || "Login failed. Please check your credentials.");
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "Login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#07150f]">
       <UserNavbar />
+      {errorMessage && (
+        <div className="max-w-md mx-auto mt-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-200 text-sm">
+          {errorMessage}
+        </div>
+      )}
       <AuthForm
         title="Welcome back"
         subtitle="Sign in to continue your shopping journey."
         fields={fields}
         onSubmit={handleLogin}
         socialProviders={socialProviders}
-        buttonLabel="Sign In"
+        buttonLabel={isLoading ? "Signing In..." : "Sign In"}
+        isSubmitDisabled={isLoading}
         footerText="Don't have an account?"
         footerLinkText="Sign up"
         footerLinkHref="/signup"

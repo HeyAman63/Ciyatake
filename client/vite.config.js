@@ -13,4 +13,7 @@ export default defineConfig({
     },
   }),
   ],
+  server: {
+    port: 5173, // Frontend runs on port 5173
+  }
 })

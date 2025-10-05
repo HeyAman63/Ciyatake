@@ -14,6 +14,7 @@ import AdminDashboardLayout from "./components/admin/common/AdminDashboardLayout
 import Dashboard from "./components/admin/dashboard.jsx";
 import Orders from "./components/admin/orders/Orders.jsx";
 import Products from "./components/admin/products/Products.jsx";
+import ProductUpload from "./components/admin/products/ProductUpload.jsx";
 import Customers from "./components/admin/customers/Customers.jsx";
 import Reports from "./components/admin/reports/Reports.jsx";
 import Users from "./components/admin/users/Users.jsx";
@@ -52,6 +53,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="orders" element={<Orders />} />
           <Route path="products" element={<Products />} />
+          <Route path="products/upload" element={<ProductUpload />} />
           <Route path="customers" element={<Customers />} />
           <Route path="reports" element={<Reports />} />
           <Route path="users" element={<Users />} />
